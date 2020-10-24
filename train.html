@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>ACGAN Trainer with TensorFlow.js (tfjs)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.6.0/dist/tf.min.js"></script>
+  <style>* {font-family:monospace;}</style>
+</head>
+<body>
+
+  <p>As mentioned <a href="https://github.com/tensorflow/tfjs-examples/blob/master/mnist-acgan/index.html" target="_blank">here</a>, generated samples should start looking good after around 15 epochs, and should be near perfect after 100 epochs.</p>
+  <hr>
+  <button id="trainBtn">train model</button>
+  <hr>
+  <button id="generateBtn">generate sample</button>
+  <hr>
+  <button id="downloadBtn">download model</button>
+  <hr>
+  <div id="generationSamplesEl"></div>
+
+
+  <script type="module">
+    import ACGAN from "./ACGAN.js";
+    let acgan = new ACGAN();
+    
+    let epochsComplete = 0;
+    let startedTraining = false;
+
+    async function train() {
+      startedTraining = true;
+      trainBtn.disabled = true;
+      trainBtn.textContent = "open console (ctrl+shift+j / cmd+option+j) to see progress";
+
+      await tf.setBackend("webgl");
+
+      await acgan.setTrainingData("MNIST");
+      
+      while(true) {
+        await acgan.train();
+        epochsComplete++;
+        await generate();
+        console.log("====== finished epoch ======");
+        trainBtn.textContent = `Epochs so far: ${epochsComplete}`;
+      }
+    }
+
+    async function generate() {
+      if(!startedTraining) return alert("You need to start training first. Click the 'train model' button.");
+      if(epochsComplete === 0) return alert("You need to wait for the first training round to complete first.");
+
+      let canvas = document.createElement("canvas");
+      canvas.style.display = "block";
+      await acgan.generate(canvas);
+      generationSamplesEl.prepend(canvas);
+    }
+
+    async function downloadModel() {
+      await acgan.downloadGeneratorModel();
+    }
+
+    trainBtn.onclick = train;
+    downloadBtn.onclick = downloadModel;
+    generateBtn.onclick = generate;
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>ACGAN Trainer with TensorFlow.js (tfjs)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.6.0/dist/tf.min.js"></script>
+</head>
+<body>
+
+  <p>The <b>model.weights.bin</b> and <b>model.json</b> are loaded from the <b>./pretrained_model</b> directory.</p>
+  <button disabled id="generateBtn">loading...</button>
+  <br><br>
+
+  <script>
+    (async function() {
+      let generatorModel = await tf.loadLayersModel(tf.io.browserHTTPRequest("./pretrained_model/model.json", {cache: 'no-cache'}));
+      generatorModel.summary();
+      await generateAndDisplay();
+
+      generateBtn.disabled = false;
+      generateBtn.textContent = "generate";
+
+      async function generateAndDisplay() {
+        let canvas = document.createElement("canvas");
+        canvas.style.display = "block";
+        await generate(generatorModel, canvas)
+        document.body.append(canvas);
+      }
+      generateBtn.onclick = generateAndDisplay;
+    })();
+
+
+    // Generate a set of examples (one for each class) using the generator model of the ACGAN.
+    // Outputs result to given canvas, or returns image data as a Uint8ClampedArray.
+    // Based on code from here: https://github.com/tensorflow/tfjs-examples/tree/master/mnist-acgan
+    async function generate(generator, canvas) {
+      tf.util.assert(generator.inputs.length === 2, `Expected model to have exactly 2 symbolic inputs, but there are ${generator.inputs.length}`);
+
+      const combinedFakes = tf.tidy(() => {
+        
+        const latentVectorLength = generator.inputs[0].shape[1];
+        const numRepeats = 10; // <-- number of times to tile the single latent vector for. Used for generating a batch of fake MNIST images.
+        
+        const latentDims = latentVectorLength;
+        const zs = new Array(latentDims).fill(0).map(_ => Math.random());
+        const singleLatentVector = tf.tensor2d(zs, [1, latentDims]);
+        const latentVectors = singleLatentVector.tile([numRepeats, 1]); // <-- the tiled latent-space vector, of shape [numRepeats, latentDim].
+
+        // Generate one fake image for each digit.
+        const sampledLabels = tf.tensor2d([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 1]);
+        // The output has pixel values in the [-1, 1] interval. Normalize it to the unit interval [0, 1].
+        const generatedImages = generator.predict([latentVectors, sampledLabels]).add(1).div(2);
+
+        // Concatenate the images horizontally into a single image.
+        return tf.concat(tf.unstack(generatedImages), 1);
+      });
+
+      let uint8Clamped = await tf.browser.toPixels(combinedFakes, canvas);
+      tf.dispose(combinedFakes);
+
+      return uint8Clamped;
+    }
+  </script>
+
+</body>
+</html>
