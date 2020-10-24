@@ -44,10 +44,9 @@
         trainBtn.textContent = `Epochs so far: ${epochsComplete}`;
       }
     }
-
+    
     async function generate() {
       if(!startedTraining) return alert("You need to start training first. Click the 'train model' button.");
-      if(epochsComplete === 0) return alert("You need to wait for the first training round to complete first.");
 
       let canvas = document.createElement("canvas");
       canvas.style.display = "block";
