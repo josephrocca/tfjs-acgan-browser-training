@@ -21,14 +21,10 @@ export default class ACGAN {
     this.learningRate = opts.learningRate ?? 0.0002,
     this.adamBeta1 = opts.adamBeta1 ?? 0.5,
 
-    this.discriminator = this.buildDiscriminator();
-    this.discriminator.summary();
-
-    this.generator = this.buildGenerator(this.latentSize);
-    this.generator.summary();
-
-    this.combinedModel = this.buildCombinedModel(this.latentSize, this.generator, this.discriminator);
-    combined.summary();
+    // These are initialised after the training data has been added with .setTrainingData(...)
+    this.discriminator = null;
+    this.generator = null;
+    this.combinedModel = null;
   }
 
 
@@ -51,6 +47,17 @@ export default class ACGAN {
     this.numClasses = labels.shape[1];
     this.xTrain = images;
     this.yTrain = tf.expandDims(labels.argMax(-1), -1);
+    
+    if(!this.combinedModel) {
+      this.discriminator = this.buildDiscriminator();
+      this.discriminator.summary();
+
+      this.generator = this.buildGenerator(this.latentSize);
+      this.generator.summary();
+
+      this.combinedModel = this.buildCombinedModel(this.latentSize, this.generator, this.discriminator);
+      combined.summary();
+    }
   }
 
 
