@@ -56,7 +56,7 @@ export default class ACGAN {
       this.generator.summary();
 
       this.combinedModel = this.buildCombinedModel(this.latentSize, this.generator, this.discriminator);
-      combined.summary();
+      this.combinedModel.summary();
     }
   }
 
