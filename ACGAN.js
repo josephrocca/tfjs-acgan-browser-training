@@ -21,21 +21,14 @@ export default class ACGAN {
     this.learningRate = opts.learningRate ?? 0.0002,
     this.adamBeta1 = opts.adamBeta1 ?? 0.5,
 
-    // Build the discriminator.
     this.discriminator = this.buildDiscriminator();
-    this.discriminator.compile({
-      optimizer: tf.train.adam(this.learningRate, this.adamBeta1),
-      loss: ['binaryCrossentropy', 'sparseCategoricalCrossentropy']
-    });
     this.discriminator.summary();
 
-    // Build the generator.
     this.generator = this.buildGenerator(this.latentSize);
     this.generator.summary();
 
-    this.optimizer = tf.train.adam(this.learningRate, this.adamBeta1);
-    this.combinedModel = this.buildCombinedModel(this.latentSize, this.generator, this.discriminator, this.optimizer);
-    
+    this.combinedModel = this.buildCombinedModel(this.latentSize, this.generator, this.discriminator);
+    combined.summary();
   }
 
 
@@ -175,7 +168,14 @@ export default class ACGAN {
     // part of ACGAN also performs multi-class classification.
     const aux = tf.layers.dense({units: this.numClasses, activation: 'softmax'}).apply(features);
 
-    return tf.model({inputs: image, outputs: [realnessScore, aux]});
+    let discriminator = tf.model({inputs: image, outputs: [realnessScore, aux]});
+
+    discriminator.compile({
+      optimizer: tf.train.adam(this.learningRate, this.adamBeta1),
+      loss: ['binaryCrossentropy', 'sparseCategoricalCrossentropy']
+    });
+
+    return discriminator;
   }
 
 
@@ -195,10 +195,9 @@ export default class ACGAN {
    * @param {tf.SymbolicTensor} imageClass Symbolic tensor for the desired image class. This is the other input to the generator.
    * @param {tf.LayersModel} generator The generator.
    * @param {tf.LayersModel} discriminator The discriminator.
-   * @param {tf.Optimizer} optimizer The optimizer to be used for training the combined model.
    * @returns {tf.LayersModel} The combined ACGAN model, compiled.
    */
-  buildCombinedModel(latentSize, generator, discriminator, optimizer) {
+  buildCombinedModel(latentSize, generator, discriminator) {
     // Latent vector. This is one of the two inputs to the generator.
     const latent = tf.input({shape: [latentSize]});
     // Desired image class. This is the second input to the generator.
@@ -211,8 +210,8 @@ export default class ACGAN {
     discriminator.trainable = false;
     [fakeImage, aux] = discriminator.apply(fakeImage);
     const combined = tf.model({inputs: [latent, imageClass], outputs: [fakeImage, aux]});
+    const optimizer = tf.train.adam(this.learningRate, this.adamBeta1);
     combined.compile({optimizer, loss: ['binaryCrossentropy', 'sparseCategoricalCrossentropy']});
-    combined.summary();
     return combined;
   }
 
