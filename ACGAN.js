@@ -251,21 +251,18 @@ export default class ACGAN {
    * @param {tf.Tensor} yTrain A tensor that contains the labels of all the training examples.
    * @param {number} batchStart Starting index of the batch.
    * @param {number} batchSize Size of the batch to draw from `xTrain` and `yTrain`.
-   * @param {number} latentSize Size of the latent space (z-space).
-   * @param {tf.LayersModel} generator The generator of the ACGAN.
-   * @param {tf.LayersModel} discriminator The discriminator of the ACGAN.
    * @returns {number[]} The loss values from the one-step training as numbers.
    */
-  async trainDiscriminatorOneStep(xTrain, yTrain, batchStart, batchSize, latentSize, generator, discriminator) {
+  async trainDiscriminatorOneStep(xTrain, yTrain, batchStart, batchSize) {
 
     const imageBatch = xTrain.slice(batchStart, batchSize);
     const labelBatch = yTrain.slice(batchStart, batchSize).asType('float32');
 
     // Latent vectors.
-    let zVectors = tf.randomUniform([batchSize, latentSize], -1, 1);
+    let zVectors = tf.randomUniform([batchSize, this.latentSize], -1, 1);
     let sampledLabels = tf.randomUniform([batchSize, 1], 0, this.numClasses, 'int32').asType('float32');
 
-    const generatedImages = generator.predict([zVectors, sampledLabels], {batchSize: batchSize});
+    const generatedImages = this.generator.predict([zVectors, sampledLabels], {batchSize: batchSize});
 
     const x = tf.concat([imageBatch, generatedImages], 0);
 
@@ -275,7 +272,7 @@ export default class ACGAN {
 
     const auxY = tf.concat([labelBatch, sampledLabels], 0);
 
-    const losses = await discriminator.trainOnBatch(x, [y, auxY]);
+    const losses = await this.discriminator.trainOnBatch(x, [y, auxY]);
     tf.dispose([x, y, auxY]);
     return losses;
   }
@@ -298,21 +295,19 @@ export default class ACGAN {
    * In this step, only the weights of the generator are updated.
    *
    * @param {number} batchSize Size of the fake-image batch to generate.
-   * @param {number} latentSize Size of the latent space (z-space).
-   * @param {tf.LayersModel} combined The instance of tf.LayersModel that combines the generator and the discriminator.
    * @returns {number[]} The loss values from the combined model as numbers.
    */
-  async trainCombinedModelOneStep(batchSize, latentSize, combinedModel) {
+  async trainCombinedModelOneStep(batchSize) {
     
     // Make new latent vectors.
-    const zVectors = tf.randomUniform([batchSize, latentSize], -1, 1); // <-- noise
+    const zVectors = tf.randomUniform([batchSize, this.latentSize], -1, 1); // <-- noise
     const sampledLabels = tf.randomUniform([batchSize, 1], 0, this.numClasses, 'int32').asType('float32');
 
     // We want to train the generator to trick the discriminator.
     // For the generator, we want all the {fake, not-fake} labels to say not-fake.
     const trick = tf.ones([batchSize, 1]).mul(this.softOne);
 
-    const losses = await combinedModel.trainOnBatch([zVectors, sampledLabels], [trick, sampledLabels]);
+    const losses = await this.combinedModel.trainOnBatch([zVectors, sampledLabels], [trick, sampledLabels]);
     tf.dispose([zVectors, sampledLabels, trick]);
     return losses;
   }
@@ -335,10 +330,10 @@ export default class ACGAN {
     for(let batch = 0; batch < numBatches; batch++) {
 
       const actualBatchSize = (batch + 1) * this.batchSize >= this.xTrain.shape[0] ? (this.xTrain.shape[0] - batch * this.batchSize) : this.batchSize;
-      const dLoss = await this.trainDiscriminatorOneStep(this.xTrain, this.yTrain, batch * this.batchSize, actualBatchSize, this.latentSize, this.generator, this.discriminator);
+      const dLoss = await this.trainDiscriminatorOneStep(this.xTrain, this.yTrain, batch * this.batchSize, actualBatchSize);
 
       // Here we use 2 * actualBatchSize here, so that we have the generator optimizer over an identical number of images as the discriminator.
-      const gLoss = await this.trainCombinedModelOneStep(2 * actualBatchSize, this.latentSize, this.combinedModel);
+      const gLoss = await this.trainCombinedModelOneStep(2 * actualBatchSize);
 
       console.log(`batch ${batch + 1}/${numBatches}: dLoss = ${dLoss[0].toFixed(6)}, gLoss = ${gLoss[0].toFixed(6)}`);
     }
