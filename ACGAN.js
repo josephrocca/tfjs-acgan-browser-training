@@ -8,12 +8,8 @@ export default class ACGAN {
 
     this.xTrain = null;
     this.yTrain = null;
-
-    // Number of classes in the MNIST dataset.
-    this.numClasses = 10;
-
-    // MNIST image size.
-    this.imageSize = 28;
+    this.numClasses = null;
+    this.imageSize = null;
 
     this.batchSize = opts.batchSize ?? 100;
     this.latentSize = opts.latentSize ?? 100;
@@ -44,7 +40,9 @@ export default class ACGAN {
 
 
 
-
+  // opts is "MNIST" or {images, labels} where:
+  //   images: tensor with shape [numImages, width, height, 1], but width must equal height (images must be square)
+  //   labels: tensor with shape [numImages, numClasses] (i.e. an array of one-hot-encoded classes)
   async setTrainingData(opts) {
     let images, labels;
     if(opts === "MNIST") {
@@ -55,6 +53,9 @@ export default class ACGAN {
       images = opts.images;
       labels = opts.labels;
     }
+    if(images.shape[1] !== images.shape[2]) throw new Error("Images must be square.");
+    this.imageSize = images.shape[1];
+    this.numClasses = labels.shape[1];
     this.xTrain = images;
     this.yTrain = tf.expandDims(labels.argMax(-1), -1);
   }
